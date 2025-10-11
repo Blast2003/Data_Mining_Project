@@ -48,7 +48,8 @@
 1. Open PowerShell or CMD at repository root.
 2. Run:
 ```powershell
-.un.bat
+.
+.\run.bat
 ```
 
 **Manual (cross-platform):**
