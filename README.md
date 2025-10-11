@@ -48,7 +48,6 @@
 1. Open PowerShell or CMD at repository root.
 2. Run:
 ```powershell
-.
 .\run.bat
 ```
 
