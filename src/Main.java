@@ -246,21 +246,63 @@ public class Main {
             // (cluster used as predictor)
             printSamplePredictions(j48, dataWithCluster, SAMPLE_PREDICTIONS);
 
+            // ---------- NEW STEP: J48 (plain, no AddCluster) ----------
+            // Run a plain J48 on the original preprocessed dataset (no cluster attribute)
+            System.out.println("\n--- STEP 3b: J48 (plain) - no AddCluster (NEW) ---");
+            J48 j48Plain = new J48();
+            j48Plain.setConfidenceFactor(0.25f);
+            j48Plain.setMinNumObj(5);
+
+            // data already has class index set to last attribute (happiness_level)
+            Evaluation evalJ48Plain = new Evaluation(data);
+            long tPlainStart = System.currentTimeMillis();
+            evalJ48Plain.crossValidateModel(j48Plain, data, CV_FOLDS, new Random(RANDOM_SEED));
+            long tPlainEnd = System.currentTimeMillis();
+            double j48PlainTimeMs = (tPlainEnd - tPlainStart);
+
+            System.out.println("J48 (plain, 10-fold CV) results:");
+            System.out.println(evalJ48Plain.toSummaryString());
+            System.out.println(evalJ48Plain.toClassDetailsString());
+            System.out.println(evalJ48Plain.toMatrixString());
+            System.out.printf("J48 (plain) CV time (ms): %.0f%n", j48PlainTimeMs);
+
+            // Train final plain J48 on full original data and print textual tree
+            j48Plain.buildClassifier(data);
+            System.out.println("\n=== Final trained J48 (plain) tree (textual) ===");
+            System.out.println(j48Plain);
+
+            // Print sample predictions for plain J48
+            printSamplePredictions(j48Plain, data, SAMPLE_PREDICTIONS);
+
             // ---------- STEP 4: Comparison and detailed evaluation ----------
-            System.out.println("\n--- STEP 4a: Comparison summary ---");
+            // Keep the original RF vs J48+AddCluster comparison unchanged, and add a new
+            // comparison between J48 plain and J48+AddCluster.
+            System.out.println("\n--- STEP 4a: Comparison summary (RandomForest vs J48 + AddCluster) ---");
             printComparisonSummary(evalRF, rfTimeMs, evalJ48, j48TimeMs);
 
-            // --- New: repeated CV comparison (paired) + aggregated metrics + McNemar
-            System.out.println("\n--- STEP 4b: Repeated (paired) CV comparison and aggregated metrics ---");
-            // Note: use standardizedForRF for RF and dataWithCluster for J48 (these match
-            // earlier steps)
-            RepeatedCVResult res = repeatedPairedCrossValidation(
+            // --- Repeated (paired) CV comparison between RF and J48+AddCluster (unchanged)
+            System.out.println("\n--- STEP 4b: Repeated (paired) CV comparison and aggregated metrics (RandomForest vs J48+AddCluster) ---");
+            RepeatedCVResult resRFvsJ48Cluster = repeatedPairedCrossValidation(
                     rf, standardizedForRF,
                     j48, dataWithCluster,
                     CV_FOLDS, REPEATED_CV_RUNS, RANDOM_SEED);
+            resRFvsJ48Cluster.printSummary();
 
-            // print summary of repeated CV
-            res.printSummary();
+            // ---------- NEW: Comparison between J48 plain and J48 + AddCluster ----------
+            System.out.println("\n--- STEP 4c (NEW): Comparison summary (J48 plain vs J48 + AddCluster) ---");
+            System.out.println("Summary (Accuracy, Kappa, CV time ms):");
+            System.out.printf(" J48 (plain)                : Accuracy=%.4f, Kappa=%.4f, Time(ms)=%.0f%n",
+                    (1 - evalJ48Plain.errorRate()), evalJ48Plain.kappa(), j48PlainTimeMs);
+            System.out.printf(" J48 (+ AddCluster KMeans)  : Accuracy=%.4f, Kappa=%.4f, Time(ms)=%.0f%n",
+                    (1 - evalJ48.errorRate()), evalJ48.kappa(), j48TimeMs);
+            System.out.println("Refer to the per-model details printed above for class-level metrics and confusion matrices.");
+
+            System.out.println("\n--- STEP 4d (NEW): Repeated paired CV comparison (J48 plain vs J48 + AddCluster) ---");
+            RepeatedCVResult resJ48Plain_vs_J48Cluster = repeatedPairedCrossValidation(
+                    j48Plain, data,
+                    j48, dataWithCluster,
+                    CV_FOLDS, REPEATED_CV_RUNS, RANDOM_SEED);
+            resJ48Plain_vs_J48Cluster.printSummary();
 
             System.out.println("\n=== PIPELINE FINISHED ===");
 
@@ -315,8 +357,8 @@ public class Main {
             System.out.printf("Total test instances across runs: %d%n", totalInstances);
             System.out.println();
 
-            System.out.printf("Model A (RandomForest) per-run accuracies: %s%n", runAccuraciesA);
-            System.out.printf("Model B (J48 + AddCluster) per-run accuracies: %s%n", runAccuraciesB);
+            System.out.printf("Model A per-run accuracies: %s%n", runAccuraciesA);
+            System.out.printf("Model B per-run accuracies: %s%n", runAccuraciesB);
             System.out.println();
 
             System.out.printf("Model A mean accuracy = %.4f  (std = %.4f)%n", mean(runAccuraciesA),
